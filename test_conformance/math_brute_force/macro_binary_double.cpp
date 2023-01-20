@@ -24,100 +24,16 @@
 
 namespace {
 
-int BuildKernel(const char *name, int vectorSize, cl_uint kernel_count,
-                cl_kernel *k, cl_program *p, bool relaxedMode)
-{
-    const char *c[] = { "#pragma OPENCL EXTENSION cl_khr_fp64 : enable\n",
-                        "__kernel void math_kernel",
-                        sizeNames[vectorSize],
-                        "( __global long",
-                        sizeNames[vectorSize],
-                        "* out, __global double",
-                        sizeNames[vectorSize],
-                        "* in1, __global double",
-                        sizeNames[vectorSize],
-                        "* in2 )\n"
-                        "{\n"
-                        "   size_t i = get_global_id(0);\n"
-                        "   out[i] = ",
-                        name,
-                        "( in1[i], in2[i] );\n"
-                        "}\n" };
-
-    const char *c3[] = {
-        "#pragma OPENCL EXTENSION cl_khr_fp64 : enable\n",
-        "__kernel void math_kernel",
-        sizeNames[vectorSize],
-        "( __global long* out, __global double* in, __global double* in2)\n"
-        "{\n"
-        "   size_t i = get_global_id(0);\n"
-        "   if( i + 1 < get_global_size(0) )\n"
-        "   {\n"
-        "       double3 f0 = vload3( 0, in + 3 * i );\n"
-        "       double3 f1 = vload3( 0, in2 + 3 * i );\n"
-        "       long3 l0 = ",
-        name,
-        "( f0, f1 );\n"
-        "       vstore3( l0, 0, out + 3*i );\n"
-        "   }\n"
-        "   else\n"
-        "   {\n"
-        "       size_t parity = i & 1;   // Figure out how many elements are "
-        "left over after BUFFER_SIZE % (3*sizeof(float)). Assume power of two "
-        "buffer size \n"
-        "       double3 f0;\n"
-        "       double3 f1;\n"
-        "       switch( parity )\n"
-        "       {\n"
-        "           case 1:\n"
-        "               f0 = (double3)( in[3*i], NAN, NAN ); \n"
-        "               f1 = (double3)( in2[3*i], NAN, NAN ); \n"
-        "               break;\n"
-        "           case 0:\n"
-        "               f0 = (double3)( in[3*i], in[3*i+1], NAN ); \n"
-        "               f1 = (double3)( in2[3*i], in2[3*i+1], NAN ); \n"
-        "               break;\n"
-        "       }\n"
-        "       long3 l0 = ",
-        name,
-        "( f0, f1 );\n"
-        "       switch( parity )\n"
-        "       {\n"
-        "           case 0:\n"
-        "               out[3*i+1] = l0.y; \n"
-        "               // fall through\n"
-        "           case 1:\n"
-        "               out[3*i] = l0.x; \n"
-        "               break;\n"
-        "       }\n"
-        "   }\n"
-        "}\n"
-    };
-
-    const char **kern = c;
-    size_t kernSize = sizeof(c) / sizeof(c[0]);
-
-    if (sizeValues[vectorSize] == 3)
-    {
-        kern = c3;
-        kernSize = sizeof(c3) / sizeof(c3[0]);
-    }
-
-    char testName[32];
-    snprintf(testName, sizeof(testName) - 1, "math_kernel%s",
-             sizeNames[vectorSize]);
-
-    return MakeKernels(kern, (cl_uint)kernSize, testName, kernel_count, k, p,
-                       relaxedMode);
-}
-
 cl_int BuildKernelFn(cl_uint job_id, cl_uint thread_id UNUSED, void *p)
 {
-    BuildKernelInfo *info = (BuildKernelInfo *)p;
-    cl_uint vectorSize = gMinVectorSizeIndex + job_id;
-    return BuildKernel(info->nameInCode, vectorSize, info->threadCount,
-                       info->kernels[vectorSize].data(),
-                       &(info->programs[vectorSize]), info->relaxedMode);
+    BuildKernelInfo &info = *(BuildKernelInfo *)p;
+    auto generator = [](const std::string &kernel_name, const char *builtin,
+                        cl_uint vector_size_index) {
+        return GetBinaryKernel(kernel_name, builtin, ParameterType::Long,
+                               ParameterType::Double, ParameterType::Double,
+                               vector_size_index);
+    };
+    return BuildKernels(info, job_id, generator);
 }
 
 // Thread specific data for a worker thread
@@ -612,13 +528,6 @@ int TestMacro_Int_Double_Double(const Func *f, MTdata d, bool relaxedMode)
     test_info.ftz = f->ftz || gForceFTZ;
     test_info.relaxedMode = relaxedMode;
 
-    // cl_kernels aren't thread safe, so we make one for each vector size for
-    // every thread
-    for (auto i = gMinVectorSizeIndex; i < gMaxVectorSizeIndex; i++)
-    {
-        test_info.k[i].resize(test_info.threadCount, nullptr);
-    }
-
     test_info.tinfo.resize(test_info.threadCount);
     for (cl_uint i = 0; i < test_info.threadCount; i++)
     {
@@ -698,14 +607,5 @@ int TestMacro_Int_Double_Double(const Func *f, MTdata d, bool relaxedMode)
     vlog("\n");
 
 exit:
-    // Release
-    for (auto i = gMinVectorSizeIndex; i < gMaxVectorSizeIndex; i++)
-    {
-        for (auto &kernel : test_info.k[i])
-        {
-            clReleaseKernel(kernel);
-        }
-    }
-
     return error;
 }
