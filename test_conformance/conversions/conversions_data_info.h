@@ -150,13 +150,13 @@ DataInfoSpec<InType, OutType>::DataInfoSpec(const DataInitInfo &agg)
     else if (std::is_same<cl_long, OutType>::value)
         ranges = std::make_pair(CL_LONG_MIN, CL_LONG_MAX);
 
-    InType outMin = ((InType)ranges.first);
-    InType outMax = ((InType)ranges.second);
-
     // clang-format off
     // for readability sake keep this section unformatted
     if (std::is_floating_point<InType>::value)
     { // from float/double
+        InType outMin = static_cast<InType>(ranges.first);
+        InType outMax = static_cast<InType>(ranges.second);
+
         InType eps = std::is_same<InType, cl_float>::value ? (InType) FLT_EPSILON : (InType) DBL_EPSILON;
         if (std::is_integral<OutType>::value)
         { // to char/uchar/short/ushort/int/uint/long/ulong
@@ -408,7 +408,9 @@ void DataInfoSpec<InType, OutType>::conv(OutType *out, InType *in)
                                              // always convert to +0.0
             }
 #else
-            *out = (*in == 0 ? 0.0 : (OutType)*in);
+            // Use volatile to prevent optimization by Clang compiler
+            volatile InType vi = *in;
+            *out = (vi == 0 ? 0.0 : static_cast<OutType>(vi));
 #endif
         }
         else if (std::is_same<cl_float, OutType>::value)
@@ -467,12 +469,21 @@ void DataInfoSpec<InType, OutType>::conv(OutType *out, InType *in)
     else
     {
         if (std::is_same<cl_float, OutType>::value)
-            *out = (*in == 0 ? 0.f : *in); // Per IEEE-754-2008 5.4.1, 0's
-                                           // always convert to +0.0
+        {
+            // Use volatile to prevent optimization by Clang compiler
+            volatile InType vi = *in;
+            // Per IEEE-754-2008 5.4.1, 0 always converts to +0.0
+            *out = (vi == 0 ? 0.0f : vi);
+        }
         else if (std::is_same<cl_double, OutType>::value)
+        {
+            // Per IEEE-754-2008 5.4.1, 0 always converts to +0.0
             *out = (*in == 0 ? 0.0 : *in);
+        }
         else
+        {
             *out = (OutType)*in;
+        }
     }
 }
 
