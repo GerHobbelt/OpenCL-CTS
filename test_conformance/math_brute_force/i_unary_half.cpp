@@ -1,5 +1,5 @@
 //
-// Copyright (c) 2017 The Khronos Group Inc.
+// Copyright (c) 2017-2024 The Khronos Group Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -19,79 +19,81 @@
 #include "test_functions.h"
 #include "utility.h"
 
-#include <cinttypes>
+#include <algorithm>
 #include <cstring>
+#include <memory>
+#include <cinttypes>
 
 namespace {
 
-cl_int BuildKernelFn(cl_uint job_id, cl_uint thread_id UNUSED, void *p)
+static cl_int BuildKernel_HalfFn(cl_uint job_id, cl_uint thread_id UNUSED,
+                                 void *p)
 {
     BuildKernelInfo &info = *(BuildKernelInfo *)p;
     auto generator = [](const std::string &kernel_name, const char *builtin,
                         cl_uint vector_size_index) {
         return GetUnaryKernel(kernel_name, builtin, ParameterType::Int,
-                              ParameterType::Float, vector_size_index);
+                              ParameterType::Half, vector_size_index);
     };
     return BuildKernels(info, job_id, generator);
 }
 
 } // anonymous namespace
 
-int TestFunc_Int_Float(const Func *f, MTdata d, bool relaxedMode)
+int TestFunc_Int_Half(const Func *f, MTdata d, bool relaxedMode)
 {
     int error;
     Programs programs;
-    const unsigned thread_id = 0; // Test is currently not multithreaded.
     KernelMatrix kernels;
-    int ftz = f->ftz || gForceFTZ || 0 == (CL_FP_DENORM & gFloatCapabilities);
-    uint64_t step = getTestStep(sizeof(float), BUFFER_SIZE);
-    int scale = (int)((1ULL << 32) / (16 * BUFFER_SIZE / sizeof(float)) + 1);
+    const unsigned thread_id = 0; // Test is currently not multithreaded.
+    int ftz = f->ftz || 0 == (gHalfCapabilities & CL_FP_DENORM) || gForceFTZ;
+    uint64_t step = getTestStep(sizeof(cl_half), BUFFER_SIZE);
+    size_t bufferElements = std::min(BUFFER_SIZE / sizeof(cl_int),
+                                     size_t(1ULL << (sizeof(cl_half) * 8)));
+    size_t bufferSizeIn = bufferElements * sizeof(cl_half);
+    size_t bufferSizeOut = bufferElements * sizeof(cl_int);
 
-    logFunctionInfo(f->name, sizeof(cl_float), relaxedMode);
-
-    Force64BitFPUPrecision();
+    logFunctionInfo(f->name, sizeof(cl_half), relaxedMode);
+    // This test is not using ThreadPool so we need to disable FTZ here
+    // for reference computations
+    FPU_mode_type oldMode;
+    DisableFTZ(&oldMode);
+    std::shared_ptr<int> at_scope_exit(
+        nullptr, [&oldMode](int *) { RestoreFPState(&oldMode); });
 
     // Init the kernels
     {
-        BuildKernelInfo build_info{ 1, kernels, programs, f->nameInCode,
-                                    relaxedMode };
-        if ((error = ThreadPool_Do(BuildKernelFn,
+        BuildKernelInfo build_info = { 1, kernels, programs, f->nameInCode };
+        if ((error = ThreadPool_Do(BuildKernel_HalfFn,
                                    gMaxVectorSizeIndex - gMinVectorSizeIndex,
                                    &build_info)))
             return error;
     }
+    std::vector<float> s(bufferElements);
 
-    for (uint64_t i = 0; i < (1ULL << 32); i += step)
+    for (uint64_t i = 0; i < (1ULL << 16); i += step)
     {
         // Init input array
-        cl_uint *p = (cl_uint *)gIn;
-        if (gWimpyMode)
-        {
-            for (size_t j = 0; j < BUFFER_SIZE / sizeof(float); j++)
-                p[j] = (cl_uint)i + j * scale;
-        }
-        else
-        {
-            for (size_t j = 0; j < BUFFER_SIZE / sizeof(float); j++)
-                p[j] = (uint32_t)i + j;
-        }
+        cl_ushort *p = (cl_ushort *)gIn;
+
+        for (size_t j = 0; j < bufferElements; j++) p[j] = (cl_ushort)i + j;
 
         if ((error = clEnqueueWriteBuffer(gQueue, gInBuffer, CL_FALSE, 0,
-                                          BUFFER_SIZE, gIn, 0, NULL, NULL)))
+                                          bufferSizeIn, gIn, 0, NULL, NULL)))
         {
             vlog_error("\n*** Error %d in clEnqueueWriteBuffer ***\n", error);
             return error;
         }
 
-        // Write garbage into output arrays
+        // write garbage into output arrays
         for (auto j = gMinVectorSizeIndex; j < gMaxVectorSizeIndex; j++)
         {
-            uint32_t pattern = 0xffffdead;
+            uint32_t pattern = 0xacdcacdc;
             if (gHostFill)
             {
-                memset_pattern4(gOut[j], &pattern, BUFFER_SIZE);
+                memset_pattern4(gOut[j], &pattern, bufferSizeOut);
                 if ((error = clEnqueueWriteBuffer(gQueue, gOutBuffer[j],
-                                                  CL_FALSE, 0, BUFFER_SIZE,
+                                                  CL_FALSE, 0, bufferSizeOut,
                                                   gOut[j], 0, NULL, NULL)))
                 {
                     vlog_error(
@@ -102,23 +104,18 @@ int TestFunc_Int_Float(const Func *f, MTdata d, bool relaxedMode)
             }
             else
             {
-                if ((error = clEnqueueFillBuffer(gQueue, gOutBuffer[j],
-                                                 &pattern, sizeof(pattern), 0,
-                                                 BUFFER_SIZE, 0, NULL, NULL)))
-                {
-                    vlog_error("Error: clEnqueueFillBuffer failed! err: %d\n",
-                               error);
-                    return error;
-                }
+                error = clEnqueueFillBuffer(gQueue, gOutBuffer[j], &pattern,
+                                            sizeof(pattern), 0, bufferSizeOut,
+                                            0, NULL, NULL);
+                test_error(error, "clEnqueueFillBuffer failed!\n");
             }
         }
 
         // Run the kernels
         for (auto j = gMinVectorSizeIndex; j < gMaxVectorSizeIndex; j++)
         {
-            size_t vectorSize = sizeValues[j] * sizeof(cl_float);
-            size_t localCount = (BUFFER_SIZE + vectorSize - 1)
-                / vectorSize; // BUFFER_SIZE / vectorSize  rounded up
+            size_t vectorSize = sizeValues[j] * sizeof(cl_int);
+            size_t localCount = (bufferSizeOut + vectorSize - 1) / vectorSize;
             if ((error = clSetKernelArg(kernels[j][thread_id], 0,
                                         sizeof(gOutBuffer[j]), &gOutBuffer[j])))
             {
@@ -146,16 +143,17 @@ int TestFunc_Int_Float(const Func *f, MTdata d, bool relaxedMode)
 
         // Calculate the correctly rounded reference result
         int *r = (int *)gOut_Ref;
-        float *s = (float *)gIn;
-        for (size_t j = 0; j < BUFFER_SIZE / sizeof(float); j++)
+        for (size_t j = 0; j < bufferElements; j++)
+        {
+            s[j] = HTF(p[j]);
             r[j] = f->func.i_f(s[j]);
-
+        }
         // Read the data back
         for (auto j = gMinVectorSizeIndex; j < gMaxVectorSizeIndex; j++)
         {
-            if ((error =
-                     clEnqueueReadBuffer(gQueue, gOutBuffer[j], CL_TRUE, 0,
-                                         BUFFER_SIZE, gOut[j], 0, NULL, NULL)))
+            if ((error = clEnqueueReadBuffer(gQueue, gOutBuffer[j], CL_TRUE, 0,
+                                             bufferSizeOut, gOut[j], 0, NULL,
+                                             NULL)))
             {
                 vlog_error("ReadArray failed %d\n", error);
                 return error;
@@ -166,7 +164,7 @@ int TestFunc_Int_Float(const Func *f, MTdata d, bool relaxedMode)
 
         // Verify data
         uint32_t *t = (uint32_t *)gOut_Ref;
-        for (size_t j = 0; j < BUFFER_SIZE / sizeof(float); j++)
+        for (size_t j = 0; j < bufferElements; j++)
         {
             for (auto k = gMinVectorSizeIndex; k < gMaxVectorSizeIndex; k++)
             {
@@ -174,7 +172,7 @@ int TestFunc_Int_Float(const Func *f, MTdata d, bool relaxedMode)
                 // If we aren't getting the correctly rounded result
                 if (t[j] != q[j])
                 {
-                    if ((ftz || relaxedMode) && IsFloatSubnormal(s[j]))
+                    if (ftz && IsHalfSubnormal(p[j]))
                     {
                         unsigned int correct0 = f->func.i_f(0.0);
                         unsigned int correct1 = f->func.i_f(-0.0);
@@ -183,10 +181,10 @@ int TestFunc_Int_Float(const Func *f, MTdata d, bool relaxedMode)
 
                     uint32_t err = t[j] - q[j];
                     if (q[j] > t[j]) err = q[j] - t[j];
-                    vlog_error("\nERROR: %s%s: %d ulp error at %a (0x%8.8x): "
+                    vlog_error("\nERROR: %s%s: %d ulp error at %a (0x%04x): "
                                "*%d vs. %d\n",
-                               f->name, sizeNames[k], err, ((float *)gIn)[j],
-                               ((cl_uint *)gIn)[j], t[j], q[j]);
+                               f->name, sizeNames[k], err, s[j], p[j], t[j],
+                               q[j]);
                     return -1;
                 }
             }
@@ -197,8 +195,8 @@ int TestFunc_Int_Float(const Func *f, MTdata d, bool relaxedMode)
             if (gVerboseBruteForce)
             {
                 vlog("base:%14" PRIu64 " step:%10" PRIu64
-                     "  bufferSize:%10d \n",
-                     i, step, BUFFER_SIZE);
+                     "  bufferSize:%10zd \n",
+                     i, step, bufferSizeOut);
             }
             else
             {

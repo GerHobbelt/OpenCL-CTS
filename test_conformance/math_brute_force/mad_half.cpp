@@ -1,5 +1,5 @@
 //
-// Copyright (c) 2017 The Khronos Group Inc.
+// Copyright (c) 2017-2024 The Khronos Group Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -19,74 +19,83 @@
 #include "test_functions.h"
 #include "utility.h"
 
-#include <cinttypes>
 #include <cstring>
 
 namespace {
 
-cl_int BuildKernelFn(cl_uint job_id, cl_uint thread_id UNUSED, void *p)
+cl_int BuildKernel_HalfFn(cl_uint job_id, cl_uint thread_id UNUSED, void *p)
 {
     BuildKernelInfo &info = *(BuildKernelInfo *)p;
     auto generator = [](const std::string &kernel_name, const char *builtin,
                         cl_uint vector_size_index) {
-        return GetUnaryKernel(kernel_name, builtin, ParameterType::Int,
-                              ParameterType::Float, vector_size_index);
+        return GetTernaryKernel(kernel_name, builtin, ParameterType::Half,
+                                ParameterType::Half, ParameterType::Half,
+                                ParameterType::Half, vector_size_index);
     };
     return BuildKernels(info, job_id, generator);
 }
 
 } // anonymous namespace
 
-int TestFunc_Int_Float(const Func *f, MTdata d, bool relaxedMode)
+int TestFunc_mad_Half(const Func *f, MTdata d, bool relaxedMode)
 {
     int error;
     Programs programs;
-    const unsigned thread_id = 0; // Test is currently not multithreaded.
     KernelMatrix kernels;
-    int ftz = f->ftz || gForceFTZ || 0 == (CL_FP_DENORM & gFloatCapabilities);
-    uint64_t step = getTestStep(sizeof(float), BUFFER_SIZE);
-    int scale = (int)((1ULL << 32) / (16 * BUFFER_SIZE / sizeof(float)) + 1);
+    const unsigned thread_id = 0; // Test is currently not multithreaded.
+    float maxError = 0.0f;
 
-    logFunctionInfo(f->name, sizeof(cl_float), relaxedMode);
+    float maxErrorVal = 0.0f;
+    float maxErrorVal2 = 0.0f;
+    float maxErrorVal3 = 0.0f;
+    size_t bufferSize = BUFFER_SIZE;
 
-    Force64BitFPUPrecision();
+    logFunctionInfo(f->name, sizeof(cl_half), relaxedMode);
+    uint64_t step = getTestStep(sizeof(cl_half), bufferSize);
 
     // Init the kernels
     {
-        BuildKernelInfo build_info{ 1, kernels, programs, f->nameInCode,
-                                    relaxedMode };
-        if ((error = ThreadPool_Do(BuildKernelFn,
+        BuildKernelInfo build_info = { 1, kernels, programs, f->nameInCode };
+        if ((error = ThreadPool_Do(BuildKernel_HalfFn,
                                    gMaxVectorSizeIndex - gMinVectorSizeIndex,
                                    &build_info)))
             return error;
     }
-
     for (uint64_t i = 0; i < (1ULL << 32); i += step)
     {
         // Init input array
-        cl_uint *p = (cl_uint *)gIn;
-        if (gWimpyMode)
+        cl_ushort *p = (cl_ushort *)gIn;
+        cl_ushort *p2 = (cl_ushort *)gIn2;
+        cl_ushort *p3 = (cl_ushort *)gIn3;
+        for (size_t j = 0; j < bufferSize / sizeof(cl_ushort); j++)
         {
-            for (size_t j = 0; j < BUFFER_SIZE / sizeof(float); j++)
-                p[j] = (cl_uint)i + j * scale;
+            p[j] = (cl_ushort)genrand_int32(d);
+            p2[j] = (cl_ushort)genrand_int32(d);
+            p3[j] = (cl_ushort)genrand_int32(d);
         }
-        else
-        {
-            for (size_t j = 0; j < BUFFER_SIZE / sizeof(float); j++)
-                p[j] = (uint32_t)i + j;
-        }
-
         if ((error = clEnqueueWriteBuffer(gQueue, gInBuffer, CL_FALSE, 0,
-                                          BUFFER_SIZE, gIn, 0, NULL, NULL)))
+                                          bufferSize, gIn, 0, NULL, NULL)))
         {
             vlog_error("\n*** Error %d in clEnqueueWriteBuffer ***\n", error);
             return error;
         }
+        if ((error = clEnqueueWriteBuffer(gQueue, gInBuffer2, CL_FALSE, 0,
+                                          bufferSize, gIn2, 0, NULL, NULL)))
+        {
+            vlog_error("\n*** Error %d in clEnqueueWriteBuffer2 ***\n", error);
+            return error;
+        }
+        if ((error = clEnqueueWriteBuffer(gQueue, gInBuffer3, CL_FALSE, 0,
+                                          bufferSize, gIn3, 0, NULL, NULL)))
+        {
+            vlog_error("\n*** Error %d in clEnqueueWriteBuffer3 ***\n", error);
+            return error;
+        }
 
-        // Write garbage into output arrays
+        // write garbage into output arrays
         for (auto j = gMinVectorSizeIndex; j < gMaxVectorSizeIndex; j++)
         {
-            uint32_t pattern = 0xffffdead;
+            uint32_t pattern = 0xacdcacdc;
             if (gHostFill)
             {
                 memset_pattern4(gOut[j], &pattern, BUFFER_SIZE);
@@ -102,23 +111,19 @@ int TestFunc_Int_Float(const Func *f, MTdata d, bool relaxedMode)
             }
             else
             {
-                if ((error = clEnqueueFillBuffer(gQueue, gOutBuffer[j],
-                                                 &pattern, sizeof(pattern), 0,
-                                                 BUFFER_SIZE, 0, NULL, NULL)))
-                {
-                    vlog_error("Error: clEnqueueFillBuffer failed! err: %d\n",
-                               error);
-                    return error;
-                }
+                error = clEnqueueFillBuffer(gQueue, gOutBuffer[j], &pattern,
+                                            sizeof(pattern), 0, BUFFER_SIZE, 0,
+                                            NULL, NULL);
+                test_error(error, "clEnqueueFillBuffer failed!\n");
             }
         }
 
         // Run the kernels
         for (auto j = gMinVectorSizeIndex; j < gMaxVectorSizeIndex; j++)
         {
-            size_t vectorSize = sizeValues[j] * sizeof(cl_float);
-            size_t localCount = (BUFFER_SIZE + vectorSize - 1)
-                / vectorSize; // BUFFER_SIZE / vectorSize  rounded up
+            size_t vectorSize = sizeof(cl_half) * sizeValues[j];
+            size_t localCount = (bufferSize + vectorSize - 1)
+                / vectorSize; // bufferSize / vectorSize  rounded up
             if ((error = clSetKernelArg(kernels[j][thread_id], 0,
                                         sizeof(gOutBuffer[j]), &gOutBuffer[j])))
             {
@@ -127,6 +132,18 @@ int TestFunc_Int_Float(const Func *f, MTdata d, bool relaxedMode)
             }
             if ((error = clSetKernelArg(kernels[j][thread_id], 1,
                                         sizeof(gInBuffer), &gInBuffer)))
+            {
+                LogBuildError(programs[j]);
+                return error;
+            }
+            if ((error = clSetKernelArg(kernels[j][thread_id], 2,
+                                        sizeof(gInBuffer2), &gInBuffer2)))
+            {
+                LogBuildError(programs[j]);
+                return error;
+            }
+            if ((error = clSetKernelArg(kernels[j][thread_id], 3,
+                                        sizeof(gInBuffer3), &gInBuffer3)))
             {
                 LogBuildError(programs[j]);
                 return error;
@@ -144,18 +161,12 @@ int TestFunc_Int_Float(const Func *f, MTdata d, bool relaxedMode)
         // Get that moving
         if ((error = clFlush(gQueue))) vlog("clFlush failed\n");
 
-        // Calculate the correctly rounded reference result
-        int *r = (int *)gOut_Ref;
-        float *s = (float *)gIn;
-        for (size_t j = 0; j < BUFFER_SIZE / sizeof(float); j++)
-            r[j] = f->func.i_f(s[j]);
-
         // Read the data back
         for (auto j = gMinVectorSizeIndex; j < gMaxVectorSizeIndex; j++)
         {
             if ((error =
                      clEnqueueReadBuffer(gQueue, gOutBuffer[j], CL_TRUE, 0,
-                                         BUFFER_SIZE, gOut[j], 0, NULL, NULL)))
+                                         bufferSize, gOut[j], 0, NULL, NULL)))
             {
                 vlog_error("ReadArray failed %d\n", error);
                 return error;
@@ -164,46 +175,12 @@ int TestFunc_Int_Float(const Func *f, MTdata d, bool relaxedMode)
 
         if (gSkipCorrectnessTesting) break;
 
-        // Verify data
-        uint32_t *t = (uint32_t *)gOut_Ref;
-        for (size_t j = 0; j < BUFFER_SIZE / sizeof(float); j++)
-        {
-            for (auto k = gMinVectorSizeIndex; k < gMaxVectorSizeIndex; k++)
-            {
-                uint32_t *q = (uint32_t *)(gOut[k]);
-                // If we aren't getting the correctly rounded result
-                if (t[j] != q[j])
-                {
-                    if ((ftz || relaxedMode) && IsFloatSubnormal(s[j]))
-                    {
-                        unsigned int correct0 = f->func.i_f(0.0);
-                        unsigned int correct1 = f->func.i_f(-0.0);
-                        if (q[j] == correct0 || q[j] == correct1) continue;
-                    }
-
-                    uint32_t err = t[j] - q[j];
-                    if (q[j] > t[j]) err = q[j] - t[j];
-                    vlog_error("\nERROR: %s%s: %d ulp error at %a (0x%8.8x): "
-                               "*%d vs. %d\n",
-                               f->name, sizeNames[k], err, ((float *)gIn)[j],
-                               ((cl_uint *)gIn)[j], t[j], q[j]);
-                    return -1;
-                }
-            }
-        }
+        // Verify data - no verification possible. MAD is a random number
+        // generator.
 
         if (0 == (i & 0x0fffffff))
         {
-            if (gVerboseBruteForce)
-            {
-                vlog("base:%14" PRIu64 " step:%10" PRIu64
-                     "  bufferSize:%10d \n",
-                     i, step, BUFFER_SIZE);
-            }
-            else
-            {
-                vlog(".");
-            }
+            vlog(".");
             fflush(stdout);
         }
     }
@@ -213,9 +190,11 @@ int TestFunc_Int_Float(const Func *f, MTdata d, bool relaxedMode)
         if (gWimpyMode)
             vlog("Wimp pass");
         else
-            vlog("passed");
-    }
+            vlog("pass");
 
+        vlog("\t%8.2f @ {%a, %a, %a}", maxError, maxErrorVal, maxErrorVal2,
+             maxErrorVal3);
+    }
     vlog("\n");
 
     return error;
