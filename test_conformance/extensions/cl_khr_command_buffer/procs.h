@@ -153,6 +153,50 @@ extern int test_negative_finalize_command_buffer_invalid_command_buffer(
 extern int test_negative_finalize_command_buffer_not_recording_state(
     cl_device_id device, cl_context context, cl_command_queue queue,
     int num_elements);
+extern int test_negative_command_buffer_command_fill_buffer_queue_not_null(
+    cl_device_id device, cl_context context, cl_command_queue queue,
+    int num_elements);
+extern int test_negative_command_buffer_command_fill_buffer_context_not_same(
+    cl_device_id device, cl_context context, cl_command_queue queue,
+    int num_elements);
+extern int
+test_negative_command_buffer_command_fill_buffer_sync_points_null_or_num_zero(
+    cl_device_id device, cl_context context, cl_command_queue queue,
+    int num_elements);
+extern int
+test_negative_command_buffer_command_fill_buffer_invalid_command_buffer(
+    cl_device_id device, cl_context context, cl_command_queue queue,
+    int num_elements);
+extern int
+test_negative_command_buffer_command_fill_buffer_finalized_command_buffer(
+    cl_device_id device, cl_context context, cl_command_queue queue,
+    int num_elements);
+extern int test_negative_command_buffer_command_fill_image_queue_not_null(
+    cl_device_id device, cl_context context, cl_command_queue queue,
+    int num_elements);
+extern int
+test_negative_command_buffer_command_fill_buffer_mutable_handle_not_null(
+    cl_device_id device, cl_context context, cl_command_queue queue,
+    int num_elements);
+extern int test_negative_command_buffer_command_fill_image_context_not_same(
+    cl_device_id device, cl_context context, cl_command_queue queue,
+    int num_elements);
+extern int
+test_negative_command_buffer_command_fill_image_sync_points_null_or_num_zero(
+    cl_device_id device, cl_context context, cl_command_queue queue,
+    int num_elements);
+extern int
+test_negative_command_buffer_command_fill_image_invalid_command_buffer(
+    cl_device_id device, cl_context context, cl_command_queue queue,
+    int num_elements);
+extern int
+test_negative_command_buffer_command_fill_image_finalized_command_buffer(
+    cl_device_id device, cl_context context, cl_command_queue queue,
+    int num_elements);
+extern int
+test_negative_command_buffer_command_fill_image_mutable_handle_not_null(
+    cl_device_id device, cl_context context, cl_command_queue queue,
+    int num_elements);
 extern int test_negative_create_command_buffer_num_queues(
     cl_device_id device, cl_context context, cl_command_queue queue,
     int num_elements);
@@ -224,6 +268,22 @@ extern int test_negative_get_command_buffer_info_context(cl_device_id device,
                                                          cl_context context,
                                                          cl_command_queue queue,
                                                          int num_elements);
+extern int test_negative_command_buffer_command_svm_queue_not_null(
+    cl_device_id device, cl_context context, cl_command_queue queue,
+    int num_elements);
+extern int
+test_negative_command_buffer_command_svm_sync_points_null_or_num_zero(
+    cl_device_id device, cl_context context, cl_command_queue queue,
+    int num_elements);
+extern int test_negative_command_buffer_command_svm_invalid_command_buffer(
+    cl_device_id device, cl_context context, cl_command_queue queue,
+    int num_elements);
+extern int test_negative_command_buffer_command_svm_finalized_command_buffer(
+    cl_device_id device, cl_context context, cl_command_queue queue,
+    int num_elements);
+extern int test_negative_command_buffer_command_svm_mutable_handle_not_null(
+    cl_device_id device, cl_context context, cl_command_queue queue,
+    int num_elements);
 extern int test_negative_command_buffer_barrier_not_null_queue(
     cl_device_id device, cl_context context, cl_command_queue queue,
     int num_elements);
@@ -254,6 +314,24 @@ extern int test_negative_enqueue_command_buffer_null_queues_num_queues(
     int num_elements);
 extern int
 test_negative_enqueue_command_buffer_num_queues_not_zero_different_while_buffer_creation(
+    cl_device_id device, cl_context context, cl_command_queue queue,
+    int num_elements);
+extern int test_negative_command_buffer_copy_image_queue_not_null(
+    cl_device_id device, cl_context context, cl_command_queue queue,
+    int num_elements);
+extern int test_negative_command_buffer_copy_image_context_not_same(
+    cl_device_id device, cl_context context, cl_command_queue queue,
+    int num_elements);
+extern int test_negative_command_buffer_copy_image_sync_points_null_or_num_zero(
+    cl_device_id device, cl_context context, cl_command_queue queue,
+    int num_elements);
+extern int test_negative_command_buffer_copy_image_invalid_command_buffer(
+    cl_device_id device, cl_context context, cl_command_queue queue,
+    int num_elements);
+extern int test_negative_command_buffer_copy_image_finalized_command_buffer(
+    cl_device_id device, cl_context context, cl_command_queue queue,
+    int num_elements);
+extern int test_negative_command_buffer_copy_image_mutable_handle_not_null(
     cl_device_id device, cl_context context, cl_command_queue queue,
     int num_elements);
 extern int test_negative_enqueue_command_buffer_not_valid_queue_in_queues(
