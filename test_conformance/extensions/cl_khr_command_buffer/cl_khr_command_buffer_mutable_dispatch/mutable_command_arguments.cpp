@@ -140,7 +140,7 @@ struct MutableDispatchGlobalArguments : public MutableDispatchArgumentsTest
 
     cl_int Run() override
     {
-        cl_ndrange_kernel_command_properties_khr props[] = {
+        cl_command_properties_khr props[] = {
             CL_MUTABLE_DISPATCH_UPDATABLE_FIELDS_KHR,
             CL_MUTABLE_DISPATCH_ARGUMENTS_KHR, 0
         };
@@ -270,7 +270,7 @@ struct MutableDispatchLocalArguments : public MutableDispatchArgumentsTest
         threads[0] = number_of_ints;
         local_threads[0] = 1;
 
-        cl_ndrange_kernel_command_properties_khr props[] = {
+        cl_command_properties_khr props[] = {
             CL_MUTABLE_DISPATCH_UPDATABLE_FIELDS_KHR,
             CL_MUTABLE_DISPATCH_ARGUMENTS_KHR, 0
         };
@@ -324,8 +324,8 @@ struct MutableDispatchLocalArguments : public MutableDispatchArgumentsTest
         for (size_t i = 0; i < number_of_ints; i++)
             if (constant_data[i] != result_data[i])
             {
-                log_error("Data failed to verify: constant_data[%d]=%d != "
-                          "result_data[%d]=%d\n",
+                log_error("Data failed to verify: constant_data[%zu]=%d != "
+                          "result_data[%zu]=%d\n",
                           i, constant_data[i], i, result_data[i]);
                 return TEST_FAIL;
             }
@@ -403,7 +403,7 @@ struct MutableDispatchPODArguments : public MutableDispatchArgumentsTest
         threads[0] = number_of_ints;
         local_threads[0] = 1;
 
-        cl_ndrange_kernel_command_properties_khr props[] = {
+        cl_command_properties_khr props[] = {
             CL_MUTABLE_DISPATCH_UPDATABLE_FIELDS_KHR,
             CL_MUTABLE_DISPATCH_ARGUMENTS_KHR, 0
         };
@@ -457,8 +457,8 @@ struct MutableDispatchPODArguments : public MutableDispatchArgumentsTest
         for (size_t i = 0; i < number_of_ints; i++)
             if (constant_data[i] != result_data[i])
             {
-                log_error("Data failed to verify: constant_data[%d]=%d != "
-                          "result_data[%d]=%d\n",
+                log_error("Data failed to verify: constant_data[%zu]=%d != "
+                          "result_data[%zu]=%d\n",
                           i, constant_data[i], i, result_data[i]);
                 return TEST_FAIL;
             }
@@ -533,7 +533,8 @@ struct MutableDispatchNullArguments : public MutableDispatchArgumentsTest
 
     cl_int Run() override
     {
-        cl_ndrange_kernel_command_properties_khr props[] = {
+
+        cl_command_properties_khr props[] = {
             CL_MUTABLE_DISPATCH_UPDATABLE_FIELDS_KHR,
             CL_MUTABLE_DISPATCH_ARGUMENTS_KHR, 0
         };
@@ -721,7 +722,7 @@ struct MutableDispatchSVMArguments : public MutableDispatchArgumentsTest
                                     sizeof(init_buffer), &init_buffer);
         test_error(error, "clSetKernelExecInfo failed for init_buffer");
 
-        cl_ndrange_kernel_command_properties_khr props[] = {
+        cl_command_properties_khr props[] = {
             CL_MUTABLE_DISPATCH_UPDATABLE_FIELDS_KHR,
             CL_MUTABLE_DISPATCH_ARGUMENTS_KHR
                 | CL_MUTABLE_DISPATCH_EXEC_INFO_KHR,
@@ -771,6 +772,7 @@ struct MutableDispatchSVMArguments : public MutableDispatchArgumentsTest
         exec_info.param_value = &new_buffer;
 
         cl_mutable_dispatch_config_khr dispatch_config{};
+        dispatch_config.command = command;
         dispatch_config.num_svm_args = 1;
         dispatch_config.arg_svm_list = &arg_svm;
         dispatch_config.num_exec_infos = 1;
