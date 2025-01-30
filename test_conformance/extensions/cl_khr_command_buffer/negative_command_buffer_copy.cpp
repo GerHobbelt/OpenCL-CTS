@@ -80,7 +80,7 @@ protected:
     const cl_image_format formats = { CL_RGBA, CL_UNSIGNED_INT8 };
     clMemWrapper image;
     clMemWrapper buffer;
-    const size_t data_size = img_width * img_height * sizeof(cl_char);
+    const size_t data_size = img_width * img_height * sizeof(cl_uint);
     clMemWrapper in_mem;
     clMemWrapper out_mem;
 };
