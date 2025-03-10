@@ -1,5 +1,5 @@
 //
-// Copyright (c) 2017 The Khronos Group Inc.
+// Copyright (c) 2025 The Khronos Group Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -13,10 +13,18 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 //
-#include "harness/testHarness.h"
+#ifndef _testBase_h
+#define _testBase_h
 
-int main(int argc, const char *argv[])
-{
-    return runTestHarness(argc, argv, test_registry::getInstance().num_tests(),
-                          test_registry::getInstance().definitions(), true, 0);
-}
+#include <CL/cl.h>
+
+#include "harness/conversions.h"
+#include "harness/testHarness.h"
+#include "harness/typeWrappers.h"
+
+extern const cl_mem_flags flag_set[];
+extern const char* flag_set_names[];
+
+#define NUM_FLAGS 5
+
+#endif // _testBase_h
