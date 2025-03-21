@@ -258,6 +258,7 @@ test_image_multipass_integer_coord(cl_device_id device, cl_context context, cl_c
 
         }
         free_mtdata(d); d = NULL;
+        free(expected_output);
         expected_output = generate_expected_byte_image(input_data, num_input_streams, img_width, img_height, 4);
         for ( i = 0; i < num_input_streams; i++)
         {

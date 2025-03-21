@@ -114,5 +114,8 @@ REGISTER_TEST(multi_queue_flush_on_release)
         return true;
     });
 
+    err = clReleaseCommandQueue(queue_B);
+    test_error(err, "clReleaseCommandQueue failed");
+
     return success ? TEST_PASS : TEST_FAIL;
 }
