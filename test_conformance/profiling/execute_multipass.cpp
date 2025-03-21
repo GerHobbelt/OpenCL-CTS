@@ -244,6 +244,7 @@ static int run_kernel( cl_device_id device, cl_context context, cl_command_queue
             return -1;
         }
 
+        clReleaseEvent(executeEvent);
         log_info( "Profiling info:\n" );
         log_info( "Time from queue to start of clEnqueueNDRangeKernel: %f seconds\n", (double)(writeStart - queueStart) / 1000000000000.f );
         log_info( "Time from start of clEnqueueNDRangeKernel to end: %f seconds\n", (double)(writeEnd - writeStart) / 1000000000000.f );
@@ -262,6 +263,7 @@ static int run_kernel( cl_device_id device, cl_context context, cl_command_queue
     }
 
     // release kernel, program, and memory objects
+    clReleaseSampler(sampler);
     clReleaseKernel( kernel[0] );
     clReleaseProgram( program[0] );
     clReleaseMemObject( memobjs[1] );
