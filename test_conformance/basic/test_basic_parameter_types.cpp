@@ -71,7 +71,7 @@ static int test_parameter_types_long(cl_device_id device, cl_context context,
                       8,   -9, 10, -11, 12, -13, 14, -15 };
     cl_ulong ul[16] = { 22, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15 };
 
-    // Calculate how large our paramter size is to the kernel
+    // Calculate how large our parameter size is to the kernel
     size_t parameter_size = sizeof(cl_long) + sizeof(cl_ulong);
 
     // Init our strings.
@@ -231,7 +231,7 @@ REGISTER_TEST(parameter_types)
     cl_float f[16] = { -23, -1, 2,  -3,  4,  -5,  6,  -7,
                        8,   -9, 10, -11, 12, -13, 14, -15 };
 
-    // Calculate how large our paramter size is to the kernel
+    // Calculate how large our parameter size is to the kernel
     size_t parameter_size = sizeof(cl_char) + sizeof(cl_uchar)
         + sizeof(cl_short) + sizeof(cl_ushort) + sizeof(cl_int)
         + sizeof(cl_uint) + sizeof(cl_float);

@@ -1977,7 +1977,7 @@ static std::string get_build_options(cl_device_id device)
 
 // Determines whether its valid to skip this test based on the driver version
 // and the features it optionally supports.
-// Whether the test should be skipped is writen into the out paramter skip.
+// Whether the test should be skipped is writen into the out parameter skip.
 // The check returns an error code for the clDeviceInfo query.
 static cl_int should_skip(cl_device_id device, cl_bool& skip)
 {
