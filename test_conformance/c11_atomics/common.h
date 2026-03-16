@@ -22,6 +22,7 @@
 
 #include "host_atomics.h"
 
+#include <algorithm>
 #include <iomanip>
 #include <limits>
 #include <sstream>
@@ -77,6 +78,7 @@ extern int
 extern cl_device_atomic_capabilities gAtomicMemCap,
     gAtomicFenceCap; // atomic memory and fence capabilities for this device
 
+extern cl_device_fp_config gDoubleFPConfig;
 extern cl_device_fp_config gFloatFPConfig;
 extern cl_device_fp_config gHalfFPConfig;
 
@@ -94,6 +96,37 @@ get_memory_scope_type_name(TExplicitMemoryScopeType scopeType);
 extern cl_int getSupportedMemoryOrdersAndScopes(
     cl_device_id device, std::vector<TExplicitMemoryOrderType> &memoryOrders,
     std::vector<TExplicitMemoryScopeType> &memoryScopes);
+
+union FloatIntUnion {
+    float f;
+    uint32_t i;
+};
+
+template <typename HostDataType> bool is_qnan(const HostDataType &value)
+{
+    if constexpr (std::is_same_v<HostDataType, float>)
+    {
+        FloatIntUnion u;
+        u.f = value;
+        if ((u.i & 0x7F800000) != 0x7F800000) return false;
+        return (u.i & 0x00400000) != 0;
+    }
+    else
+        return std::isnan(value);
+}
+
+template <typename HostDataType> bool is_snan(const HostDataType &value)
+{
+    if constexpr (std::is_same_v<HostDataType, float>)
+    {
+        FloatIntUnion u;
+        u.f = value;
+        if ((u.i & 0x7F800000) != 0x7F800000) return false;
+        return (u.i & 0x00400000) == 0;
+    }
+    else
+        return std::isnan(value);
+}
 
 class AtomicTypeInfo {
 public:
@@ -186,6 +219,7 @@ public:
     virtual bool
     IsTestNotAsExpected(const HostDataType &expected,
                         const std::vector<HostAtomicType> &testValues,
+                        const std::vector<HostDataType> &startRefValues,
                         cl_uint whichDestValue)
     {
         return expected
@@ -924,12 +958,15 @@ CBasicTest<HostAtomicType, HostDataType>::ProgramHeader(cl_uint maxNumDestItems)
             + ss.str() + "] = {\n";
         ss.str("");
 
-        if constexpr (std::is_same_v<HostDataType, HOST_FLOAT>)
+        if constexpr (
+            std::is_same_v<
+                HostDataType,
+                HOST_DOUBLE> || std::is_same_v<HostDataType, HOST_FLOAT>)
         {
             if (std::isinf(_startValue))
                 ss << (_startValue < 0 ? "-" : "") << "INFINITY";
             else if (std::isnan(_startValue))
-                ss << "0.0f / 0.0f";
+                ss << "0.0 / 0.0";
             else
                 ss << std::setprecision(
                     std::numeric_limits<HostDataType>::max_digits10)
@@ -1241,9 +1278,8 @@ int CBasicTest<HostAtomicType, HostDataType>::ExecuteSingleTest(
             programSource = PragmaHeader(deviceID) + ProgramHeader(numDestItems)
                 + FunctionCode() + KernelCode(numDestItems);
             programLine = programSource.c_str();
-            if (create_single_kernel_helper_with_build_options(
-                    context, &program, &kernel, 1, &programLine,
-                    "test_atomic_kernel", gOldAPI ? "" : nullptr))
+            if (create_single_kernel_helper(context, &program, &kernel, 1,
+                                            &programLine, "test_atomic_kernel"))
             {
                 return -1;
             }
@@ -1502,7 +1538,7 @@ int CBasicTest<HostAtomicType, HostDataType>::ExecuteSingleTest(
                            startRefValues.size() ? &startRefValues[0] : 0, i))
             break; // no expected value function provided
 
-        if (IsTestNotAsExpected(expected, destItems, i))
+        if (IsTestNotAsExpected(expected, destItems, startRefValues, i))
         {
             std::stringstream logLine;
             logLine << "ERROR: Result " << i
