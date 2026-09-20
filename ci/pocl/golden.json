@@ -9,13 +9,21 @@
     },
     "test_api": {
         "": {
+          "consistency_read_write_images": "pass",
+          "min_max_image_array_size": "pass",
+          "min_max_read_image_args": "pass",
+          "min_max_write_image_args": "pass",
           "negative_set_kernel_arg_invalid_image_msaa": "skip",
           "negative_set_kernel_arg_invalid_image": "fail"
         }
     },
     "test_basic": {
         "": {
-            "enqueue_map_image": "pass"
+            "enqueue_map_image": "pass",
+            "arraycopy": "pass",
+            "host_numeric_constants": "pass",
+            "kernel_numeric_constants": "pass",
+            "kernel_preprocessor_macros": "pass"
         }
     },
     "test_bruteforce": {
@@ -146,6 +154,12 @@
             "3Dto2Darray": "pass"
         }
     },
+    "test_commonfns": {
+        "": {
+            "clamp": "pass",
+            "clamp_scalar_bounds": "pass"
+        }
+    },
     "test_computeinfo": {
         "": {
             "computeinfo": "pass",
@@ -173,6 +187,17 @@
             "1D": "fail"
         }
     },
+    "test_printf": {
+        "": {
+            "return_value": "pass"
+        }
+    },
+    "test_relationals": {
+        "": {
+            "relational_all": "pass",
+            "relational_any": "pass"
+        }
+    },
     "test_select": {
         "--num-worker-threads 2": {
             "select_uchar_uchar": "pass",
@@ -197,6 +222,35 @@
             "select_long_long": "pass",
             "select_double_ulong": "pass",
             "select_double_long": "pass"
+        }
+    },
+    "test_spirv_new": {
+        "": {
+            "basic_versions": "pass",
+            "access_chain_array": "pass",
+            "access_chain_inbounds_array": "pass",
+            "ptr_access_chain_array": "pass",
+            "ptr_access_chain_inbounds_array": "pass",
+            "access_chain_vector": "pass",
+            "access_chain_inbounds_vector": "pass",
+            "ptr_access_chain_vector": "pass",
+            "ptr_access_chain_inbounds_vector": "pass",
+            "linkage_export_function_compile": "pass",
+            "linkage_import_function_compile": "pass",
+            "linkage_import_function_link": "pass",
+            "linkage_linkonce_odr": "skip",
+            "op_spec_constant_uint_simple": "pass",
+            "op_spec_constant_uchar_simple": "pass",
+            "op_spec_constant_ushort_simple": "pass",
+            "op_spec_constant_ulong_simple": "pass",
+            "op_spec_constant_float_simple": "pass",
+            "op_spec_constant_half_simple": "pass",
+            "op_spec_constant_double_simple": "pass",
+            "op_spec_constant_true_simple": "pass",
+            "op_spec_constant_false_simple": "pass",
+            "op_spec_constant_compile_link": "pass",
+            "op_spec_constant_build_twice": "pass",
+            "op_spec_constant_compile_twice": "pass"
         }
     },
     "test_vectors": {
