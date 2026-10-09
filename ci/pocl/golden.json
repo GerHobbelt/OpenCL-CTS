@@ -16,7 +16,8 @@
           "min_max_samplers": "pass",
           "min_max_write_image_args": "pass",
           "negative_set_kernel_arg_invalid_image_msaa": "skip",
-          "negative_set_kernel_arg_invalid_image": "pass"
+          "negative_set_kernel_arg_invalid_image": "pass",
+          "set_kernel_arg_struct_array": "pass"
         }
     },
     "test_atomics": {
@@ -30,7 +31,10 @@
             "arraycopy": "pass",
             "host_numeric_constants": "pass",
             "kernel_numeric_constants": "pass",
-            "kernel_preprocessor_macros": "pass"
+            "kernel_preprocessor_macros": "pass",
+            "loop": "pass",
+            "local_arg_def": "pass",
+            "local_kernel_def": "pass"
         }
     },
     "test_bruteforce": {
@@ -165,8 +169,23 @@
         "": {
             "clamp": "pass",
             "clamp_scalar_bounds": "pass",
+            "degrees": "fail",
+            "fmax": "pass",
+            "fmaxf": "pass",
+            "fmin": "pass",
+            "fminf": "pass",
+            "max": "pass",
+            "maxf": "pass",
+            "min": "pass",
+            "minf": "pass",
             "mix": "pass",
-            "mixf": "pass"
+            "mixf": "pass",
+            "radians": "fail",
+            "sign": "pass",
+            "smoothstep": "pass",
+            "smoothstepf": "pass",
+            "step": "pass",
+            "stepf": "pass"
         }
     },
     "test_compiler": {
@@ -217,6 +236,77 @@
         },
         "--num-worker-threads 2 CL_FILTER_NEAREST CL_R": {
             "1D": "fail"
+        }
+    },
+    "test_integer_ops": {
+        "--wimpy": {
+            "long_math": "pass",
+            "long_logic": "pass",
+            "long_shift": "pass",
+            "long_compare": "pass",
+            "ulong_math": "pass",
+            "ulong_logic": "pass",
+            "ulong_shift": "pass",
+            "ulong_compare": "pass",
+            "int_math": "pass",
+            "int_logic": "pass",
+            "int_shift": "pass",
+            "int_compare": "pass",
+            "uint_math": "pass",
+            "uint_logic": "pass",
+            "uint_shift": "pass",
+            "uint_compare": "pass",
+            "short_math": "pass",
+            "short_logic": "pass",
+            "short_shift": "pass",
+            "short_compare": "pass",
+            "ushort_math": "pass",
+            "ushort_logic": "pass",
+            "ushort_shift": "pass",
+            "ushort_compare": "pass",
+            "char_math": "pass",
+            "char_logic": "pass",
+            "char_shift": "pass",
+            "char_compare": "pass",
+            "uchar_math": "pass",
+            "uchar_logic": "pass",
+            "uchar_shift": "pass",
+            "uchar_compare": "pass",
+            "vector_scalar": "pass",
+            "integer_clz": "pass",
+            "integer_ctz": "pass",
+            "integer_addAssign": "pass",
+            "integer_subtractAssign": "pass",
+            "integer_multiplyAssign": "pass",
+            "integer_exclusiveOrAssign": "pass",
+            "integer_orAssign": "pass",
+            "integer_andAssign": "pass",
+            "integer_divideAssign": "pass",
+            "integer_moduloAssign": "pass",
+            "integer_hadd": "pass",
+            "integer_rhadd": "pass",
+            "integer_min": "pass",
+            "integer_max": "pass",
+            "integer_mul_hi": "pass",
+            "integer_rotate": "pass",
+            "integer_clamp": "pass",
+            "integer_mad_sat": "pass",
+            "integer_mad_hi": "pass",
+            "integer_upsample": "pass",
+            "integer_mul24": "pass",
+            "integer_mad24": "pass",
+            "integer_sub_sat": "pass",
+            "integer_add_sat": "pass",
+            "integer_abs": "pass",
+            "integer_abs_diff": "pass",
+            "unary_ops_full": "pass",
+            "unary_ops_increment": "pass",
+            "unary_ops_decrement": "pass",
+            "popcount": "pass",
+            "integer_dot_product": "pass",
+            "extended_bit_ops_extract": "pass",
+            "extended_bit_ops_insert": "pass",
+            "extended_bit_ops_reverse": "fail"
         }
     },
     "test_printf": {
