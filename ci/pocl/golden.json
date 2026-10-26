@@ -9,6 +9,7 @@
     },
     "test_api": {
         "": {
+          "binary_create_with_header": "pass",
           "consistency_read_write_images": "pass",
           "min_max_image_array_size": "pass",
           "min_max_mem_alloc_size": "pass",
@@ -16,6 +17,7 @@
           "min_max_read_write_image_args": "pass",
           "min_max_samplers": "pass",
           "min_max_write_image_args": "pass",
+          "negative_enqueue_zero_work_group": "pass",
           "negative_set_kernel_arg_invalid_image_msaa": "skip",
           "negative_set_kernel_arg_invalid_image": "pass",
           "set_kernel_arg_struct_array": "pass"
