@@ -221,6 +221,10 @@ int copy_region(size_t src, size_t soffset[3], size_t sregion[3], size_t dst,
                           "clEnqueueCopyBufferRect failed between %u and %u",
                           (unsigned)src, (unsigned)dst);
         }
+        // The buffers are created with CL_MEM_USE_HOST_PTR using the verify
+        // buffers as host_ptr, so the copy must complete before the verify
+        // buffers are modified on the host below.
+        CL_EXIT_ERROR(clFinish(gQueue), "clFinish failed");
     }
 
     // Copy between host buffers.
