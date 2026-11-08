@@ -910,19 +910,32 @@ int parseAndCallCommandLineTests(int argc, const char *argv[],
         print_results(gFailCount, gTestCount, "sub-test");
         print_results(gTestsFailed, gTestsFailed + gTestsPassed, "test");
 
+        std::vector<const char *> failedTests;
+        for (int i = 0; i < testNum; i++)
+        {
+            switch (resultTestList[i])
+            {
+                case TEST_PASS:
+                case TEST_SKIP: break;
+                case TEST_FAIL:
+                default: failedTests.push_back(testList[i].name); break;
+            }
+        }
+
+        if (!failedTests.empty())
+        {
+            log_error("Failed tests:\n");
+            for (const char *name : failedTests)
+            {
+                log_error("\t%s\n", name);
+            }
+            fflush(stdout);
+        }
+
         ret = saveResultsToJson(argv[0], testList, selectedTestList,
                                 resultTestList.data(), testNum);
 
-        if (std::any_of(resultTestList.begin(), resultTestList.end(),
-                        [](test_status result) {
-                            switch (result)
-                            {
-                                case TEST_PASS:
-                                case TEST_SKIP: return false;
-                                case TEST_FAIL:
-                                default: return true;
-                            };
-                        }))
+        if (!failedTests.empty())
         {
             ret = EXIT_FAILURE;
         }
