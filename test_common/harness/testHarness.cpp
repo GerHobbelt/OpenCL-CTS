@@ -321,11 +321,14 @@ int runTestHarnessWithCheck(int argc, const char *argv[], int testNum,
     {
         char *fileName = getenv("CL_CONFORMANCE_RESULTS_FILENAME");
 
-        log_info(
-            "Usage: %s [<test name>*] [pid<num>] [id<num>] [<device type>]\n",
-            argv[0]);
+        log_info("Usage: %s [<test name>*] [^<test name>*] [pid<num>] "
+                 "[id<num>] [<device type>]\n",
+                 argv[0]);
         log_info("\t<test name>\tOne or more of: (wildcard character '*') "
                  "(default *)\n");
+        log_info("\t^<test name>\tExclude matching test(s) (wildcard "
+                 "character '*' allowed). If only exclusions are given,\n"
+                 "\t\t\tall other tests are run.\n");
         log_info("\tpid<num>\tIndicates platform at index <num> should be used "
                  "(default 0).\n");
         log_info("\tid<num>\t\tIndicates device at index <num> should be used "
@@ -735,7 +738,8 @@ int runTestHarnessWithCheck(int argc, const char *argv[], int testNum,
 
 static int find_matching_tests(test_definition testList[],
                                unsigned char selectedTestList[], int testNum,
-                               const char *argument, bool isWildcard)
+                               const char *argument, bool isWildcard,
+                               bool exclude = false)
 {
     int found_tests = 0;
     size_t wildcard_length = strlen(argument) - 1; /* -1 for the asterisk */
@@ -746,7 +750,12 @@ static int find_matching_tests(test_definition testList[],
             || (isWildcard
                 && strncmp(testList[i].name, argument, wildcard_length) == 0))
         {
-            if (selectedTestList[i])
+            found_tests = 1;
+            if (exclude)
+            {
+                selectedTestList[i] = 0;
+            }
+            else if (selectedTestList[i])
             {
                 log_error("ERROR: Test '%s' has already been selected.\n",
                           testList[i].name);
@@ -761,19 +770,19 @@ static int find_matching_tests(test_definition testList[],
             else
             {
                 selectedTestList[i] = 1;
-                found_tests = 1;
-                if (!isWildcard)
-                {
-                    break;
-                }
+            }
+
+            if (!isWildcard)
+            {
+                break;
             }
         }
     }
 
     if (!found_tests)
     {
-        log_error("ERROR: The argument '%s' did not match any test names.\n",
-                  argument);
+        log_error("ERROR: The argument '%s%s' did not match any test names.\n",
+                  exclude ? "^" : "", argument);
         return EXIT_FAILURE;
     }
 
@@ -821,15 +830,32 @@ int parseAndCallCommandLineTests(int argc, const char *argv[],
 
     unsigned char *selectedTestList = (unsigned char *)calloc(testNum, 1);
 
-    if (argc == 1)
+    /* Arguments starting with '^' exclude tests (wildcards allowed). */
+    bool haveInclusions = false;
+    for (int i = 1; i < argc; i++)
     {
-        /* No actual arguments, all tests will be run. */
+        if (argv[i][0] != '^')
+        {
+            haveInclusions = true;
+            break;
+        }
+    }
+
+    if (!haveInclusions)
+    {
+        /* No inclusion arguments, start with all tests selected. */
         memset(selectedTestList, 1, testNum);
     }
     else
     {
+        /* First pass: select tests. */
         for (int i = 1; i < argc; i++)
         {
+            if (argv[i][0] == '^')
+            {
+                continue;
+            }
+
             if (strchr(argv[i], '*') != NULL)
             {
                 ret = find_matching_tests(testList, selectedTestList, testNum,
@@ -854,6 +880,24 @@ int parseAndCallCommandLineTests(int argc, const char *argv[],
                 break;
             }
         }
+    }
+
+    /* Second pass: deselect excluded tests. */
+    for (int i = 1; i < argc && ret == EXIT_SUCCESS; i++)
+    {
+        if (argv[i][0] != '^')
+        {
+            continue;
+        }
+        const char *name = argv[i] + 1;
+        if (*name == 0)
+        {
+            log_error("ERROR: Empty test name after '^'.\n");
+            ret = EXIT_FAILURE;
+            break;
+        }
+        ret = find_matching_tests(testList, selectedTestList, testNum, name,
+                                  strchr(name, '*') != NULL, true);
     }
 
     if (ret == EXIT_SUCCESS)
